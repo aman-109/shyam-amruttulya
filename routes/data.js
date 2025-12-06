@@ -82,89 +82,39 @@ router.get("/data", auth, async (req, res) => {
 router.post("/today", auth, async (req, res) => {
   try {
     const payload = req.body.today;
+
     if (!payload || !Array.isArray(payload.categories))
       return res.status(400).json({ error: "Invalid today payload" });
 
-    const user = req.user;
     const todayDate = dayjs().format("YYYY-MM-DD");
+    const user = req.user;
 
-    // ensure user.today exists and for today
+    // Ensure today.date is correct
     if (!user.today || user.today.date !== todayDate) {
       user.today = {
         date: todayDate,
-        categories:
-          user.today && Array.isArray(user.today.categories)
-            ? user.today.categories.map((c) => ({ ...c, count: 0 }))
-            : [
-                { id: 1, name: "Tea", price: 10, count: 0 },
-                { id: 2, name: "Coffee", price: 20, count: 0 },
-                { id: 3, name: "Black Coffee", price: 15, count: 0 },
-                { id: 4, name: "Cigarette (₹10)", price: 10, count: 0 },
-                { id: 5, name: "Cigarette (₹12)", price: 12, count: 0 },
-                { id: 6, name: "Cigarette (₹17)", price: 17, count: 0 },
-                { id: 7, name: "Cigarette (₹20)", price: 20, count: 0 },
-                { id: 8, name: "Biscuits", price: 5, count: 0 },
-                { id: 9, name: "Sweet", price: 5, count: 0 },
-                { id: 10, name: "Water Bottle (Small)", price: 10, count: 0 },
-                { id: 11, name: "Water Bottle (Large)", price: 20, count: 0 },
-                { id: 12, name: "Doughnut", price: 10, count: 0 },
-              ],
+        categories: payload.categories,
       };
+    } else {
+      // Merge counts instead of overwriting
+      user.today.categories = user.today.categories.map((c) => {
+        const incoming = payload.categories.find((x) => x.id === c.id);
+        if (!incoming) return c;
+        return {
+          ...c,
+          count: incoming.count, // Only update count from incoming
+        };
+      });
     }
 
-    // Merge: prefer matching by id then by _id if present
-    const mergedCategories = user.today.categories.map((stored) => {
-      const incoming =
-        payload.categories.find((c) => c.id === stored.id) ||
-        payload.categories.find((c) => String(c._id) === String(stored._id));
-
-      if (!incoming) return stored;
-
-      // use numeric coercion and clamp
-      const incomingCount = Number(incoming.count);
-      return {
-        ...stored,
-        count: Number.isFinite(incomingCount)
-          ? Math.max(0, incomingCount)
-          : stored.count,
-      };
-    });
-
-    user.today = { date: todayDate, categories: mergedCategories };
     await user.save();
 
-    // Build report items safely
-    const items = mergedCategories
-      .filter((c) => c && (c.count || c.count === 0) && c.count > 0)
-      .map((c) => ({
-        id: Number(c.id),
-        name: String(c.name),
-        price: Number(c.price),
-        count: Number(c.count),
-        amount: Number(c.count) * Number(c.price),
-      }))
-      .filter((it) => !isNaN(it.amount) && !isNaN(it.price));
-
-    const totalQty = items.reduce((s, it) => s + it.count, 0);
-    const totalAmount = items.reduce((s, it) => s + it.amount, 0);
-
-    const updatedReport = await Report.findOneAndUpdate(
-      { userId: user._id, date: todayDate },
-      { userId: user._id, date: todayDate, items, totalQty, totalAmount },
-      { upsert: true, new: true }
-    );
-
-    const reports = await Report.find({ userId: user._id })
-      .sort({ date: -1 })
-      .lean();
-
-    res.json({ ok: true, today: user.today, updatedReport, reports });
+    res.json({ ok: true, today: user.today });
   } catch (err) {
-    console.error("POST /today error:", err);
+    console.error("/today merge error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
-
 /**
  * POST /api/close
  * creates/upserts the report for today and resets user.today counts to 0
