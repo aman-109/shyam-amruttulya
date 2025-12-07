@@ -10,5 +10,7 @@ module.exports = [
   { id: 9, name: "Sweet", price: 5, count: 0 },
   { id: 10, name: "Water Bottle (Small)", price: 10, count: 0 },
   { id: 11, name: "Water Bottle (Large)", price: 20, count: 0 },
-  { id: 12, name: "Doughnut", price: 10, count: 0 }
+  { id: 12, name: "Doughnut", price: 10, count: 0 },
+  { id: 13, name: "Cigarette (₹15)", price: 15, count: 0 },
+  { id: 14, name: "Tea (Bank)", price: 8, count: 0 },
 ];
