@@ -8,7 +8,7 @@ const defaultCategories = require("../config/defaultCategories");
 const User = require("../models/User");
 const Report = require("../models/Report");
 
-const JWT_SECRET = process.env.JWT_SECRET || "change_this_secret";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // auth middleware
 async function auth(req, res, next) {
